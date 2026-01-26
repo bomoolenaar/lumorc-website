@@ -106,7 +106,7 @@ function sampleTextToPoints(text) {
   return pts;
 }
 
-const textPoints = sampleTextToPoints('AMONGUS');
+const textPoints = sampleTextToPoints('LUMORC');
 
 for (let i = 0; i < PARTICLE_COUNT; i++) {
   const i3 = i * 3;
