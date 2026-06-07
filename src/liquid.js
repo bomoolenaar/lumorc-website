@@ -182,25 +182,23 @@ function initLiquid(mount) {
           if (dd < best) { best = dd; act = r; rect = rc; }
         }
         side = isMobile ? 0.5 : (act.dataset.text === 'left' ? 0.72 : act.dataset.text === 'right' ? 0.28 : 0.5);
-        // Vertical placement: park the object at a fixed "rest" spot and HOLD it there
-        // while the section is in view (a dead zone), only nudging a little as the
-        // section enters/leaves — so it never rides the scroll all the way to the next
-        // object. Desktop: level with the centred text. Mobile: parked just BELOW the
-        // stacked text block (under the text, not behind it) using its real height.
         const tEl = act.querySelector('.row-text');
         const tRect = tEl ? tEl.getBoundingClientRect() : rect;
         const winH = window.innerHeight;
-        let rest = 0.5;
         if (isMobile) {
-          const halfText = (tRect.height / 2) / winH; // text block half-height, screen fraction
-          rest = clamp(0.5 + halfText + 0.06, 0.6, 0.82); // park clear, below the centred text
+          // PHONE: a completely fixed vertical spot — parked just below the text block
+          // (using its real height) and NEVER following the scroll, so it always stays
+          // put under the text instead of drifting with the page.
+          const halfText = (tRect.height / 2) / winH;
+          cyFrac = clamp(0.5 + halfText + 0.06, 0.6, 0.82);
+        } else {
+          // DESKTOP: level with the centred text, held in place by a dead zone; only a
+          // small nudge as the section enters/leaves so it never rides the full scroll.
+          const off = (tRect.top + tRect.height / 2) / winH - 0.5;
+          const DEAD = 0.22, give = 0.09;
+          const raw = off > DEAD ? off - DEAD : off < -DEAD ? off + DEAD : 0;
+          cyFrac = clamp(0.5 + clamp(raw, -give, give), 0.3, 0.84);
         }
-        const off = (tRect.top + tRect.height / 2) / winH - 0.5; // text centre vs screen centre
-        const DEAD = 0.22;                    // within this band the object stays put at rest
-        const give = isMobile ? 0.12 : 0.09;  // most it may wander once past the dead zone
-        let follow = off > DEAD ? off - DEAD : off < -DEAD ? off + DEAD : 0;
-        follow = clamp(follow, -give, give);
-        cyFrac = clamp(rest + follow, 0.3, 0.84);
         if (STAGES[act.dataset.stage]) activeStage = act.dataset.stage;
       }
       // trigger a transition when the section's object changes
