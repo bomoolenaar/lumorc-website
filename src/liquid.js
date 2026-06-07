@@ -182,14 +182,11 @@ function initLiquid(mount) {
           if (dd < best) { best = dd; act = r; rect = rc; }
         }
         side = isMobile ? 0.5 : (act.dataset.text === 'left' ? 0.72 : act.dataset.text === 'right' ? 0.28 : 0.5);
-        if (isMobile) {
-          // sit the object just BELOW the section's text block
-          const tEl = act.querySelector('.row-text');
-          const tb = tEl ? tEl.getBoundingClientRect().bottom : rect.top + rect.height / 2;
-          cyFrac = clamp((tb + window.innerHeight * 0.1) / window.innerHeight, 0.42, 0.82);
-        } else {
-          cyFrac = clamp((rect.top + rect.height / 2) / window.innerHeight, 0.26, 0.74);
-        }
+        // Pin the object to a fixed on-screen spot instead of tracking the section's
+        // scroll position — otherwise it drifts down as you scroll and then eases back
+        // up to its rest spot ("scrolls with, then snaps back"). Centred vertically on
+        // desktop; a touch lower on mobile so it sits clear of the stacked text.
+        cyFrac = isMobile ? 0.6 : 0.5;
         if (STAGES[act.dataset.stage]) activeStage = act.dataset.stage;
       }
       // trigger a transition when the section's object changes
