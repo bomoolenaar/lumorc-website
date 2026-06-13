@@ -226,12 +226,18 @@ main {
     --gutter: clamp(18px, 6vw, 32px);
   }
 
+  /* Phone: text rides the TOP of each section so the 3D object gets the lower
+     half to itself (it's parked there at a fixed spot by liquid.js). */
   .row {
-    min-height: 85vh;
-    padding-block: 10vh;
+    min-height: 92vh;
+    padding-block: 13vh 6vh;
+    align-items: flex-start;
   }
   .row--hero {
-    min-height: 90vh;
+    min-height: 92vh;
+  }
+  .row--center {
+    align-items: flex-start;
   }
 
   .row .container,
@@ -375,27 +381,25 @@ h3 {
   justify-content: center;
 }
 
+/* fully rounded pill buttons — same shape as the top-bar Contact button */
 .btn {
   display: inline-flex;
   align-items: center;
-  gap: 10px;
-  padding: 13px 22px;
+  gap: 8px;
+  padding: 13px 24px;
   border-radius: 999px;
   font-size: 14.5px;
   font-weight: 500;
-  letter-spacing: -0.01em;
+  letter-spacing: -0.005em;
   border: 1px solid transparent;
   cursor: pointer;
-  transition: transform 0.25s var(--ease), background 0.25s var(--ease),
-    border-color 0.25s var(--ease), color 0.25s var(--ease);
+  transition: transform 0.2s var(--ease), background 0.2s var(--ease),
+    border-color 0.2s var(--ease), color 0.2s var(--ease);
 }
 
+/* drop the trailing → arrow that makes CTAs read as templated */
 .btn .arrow {
-  transition: transform 0.25s var(--ease);
-}
-
-.btn:hover .arrow {
-  transform: translateX(3px);
+  display: none;
 }
 
 .btn-primary {
@@ -404,8 +408,8 @@ h3 {
 }
 
 .btn-primary:hover {
-  transform: translateY(-2px);
-  background: #e9eaee;
+  background: #e7e8ec;
+  transform: translateY(-1px);
 }
 
 .btn-ghost {
@@ -417,7 +421,6 @@ h3 {
 .btn-ghost:hover {
   background: var(--surface-2);
   border-color: rgba(255, 255, 255, 0.32);
-  transform: translateY(-2px);
 }
 
 /* ---- approach steps (inline list) ---------------------------------------- */
@@ -546,9 +549,14 @@ h3 {
   background: var(--surface);
 }
 
+/* the top-bar Contact button — a nicely rounded pill (stays round even though
+   the page CTAs are now sharp), with comfortable padding and a subtle fill */
 .nav .nav-cta {
   color: var(--text);
+  padding: 9px 20px;
   border: 1px solid var(--border-strong);
+  border-radius: 999px;
+  background: var(--surface);
 }
 
 .nav .nav-cta:hover {
@@ -612,6 +620,332 @@ h3 {
 .reveal.is-visible {
   opacity: 1;
   transform: none;
+}
+
+/* ===========================================================================
+   CONTACT ROOM — a second "room" reached by clicking the email. The 3D camera
+   trucks right (liquid.js) while this slides in from the right, so leaving the
+   page reads as walking into an adjacent room. Same palette as everything
+   else — no accent colours, just the monochrome surface/border/text tokens.
+   =========================================================================== */
+
+/* fallback scroll-lock for reduced-motion (Lenis isn't running to .stop()) */
+html.scroll-lock,
+html.scroll-lock body {
+  overflow: hidden;
+}
+
+.room {
+  position: fixed;
+  inset: 0;
+  z-index: 90; /* below the sticky header (z-index 100) so the top bar stays visible */
+  display: flex;
+  overflow-y: auto;
+  /* just enough top padding to clear the 72px sticky header — form rides high */
+  padding: 76px var(--gutter) clamp(40px, 7vh, 72px);
+  opacity: 0;
+  transform: translateX(100%);
+  pointer-events: none;
+  transition: transform 0.9s var(--ease), opacity 0.6s var(--ease);
+}
+
+body.room-open .room {
+  opacity: 1;
+  transform: translateX(0);
+  pointer-events: auto;
+}
+
+/* the page you're leaving slides left and dims as the room arrives — the header
+   (top bar) stays put so the nav is available inside the room */
+main {
+  transition: transform 0.9s var(--ease), opacity 0.6s var(--ease);
+}
+
+body.room-open main {
+  transform: translateX(-6%);
+  opacity: 0;
+  pointer-events: none;
+}
+
+/* the footer (© 2026 LUMORC …) pops up along the bottom while the contact room
+   is open, so the page keeps its sign-off in the room too */
+body.room-open .site-footer {
+  position: fixed;
+  inset: auto 0 0 0;
+  z-index: 95; /* above the room (90), below the sticky header (100) */
+  animation: footerPop 0.55s var(--ease) 0.18s both;
+}
+
+body.room-open .room {
+  /* reserve space so a long form scrolls clear of the popped-up footer */
+  padding-bottom: 92px;
+}
+
+@keyframes footerPop {
+  from { transform: translateY(100%); opacity: 0; }
+  to { transform: translateY(0); opacity: 1; }
+}
+
+.room-inner {
+  margin-block: 0 auto; /* sit toward the top so it never reaches the bottom */
+  margin-inline: 0; /* sit on the left — the 3D object parks on the right */
+  width: min(460px, 100%);
+}
+
+.room-back {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 16px;
+  padding: 9px 16px;
+  font-family: var(--font-mono);
+  font-size: 12px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--muted);
+  background: transparent;
+  border: 1px solid var(--border-strong);
+  border-radius: 999px;
+  cursor: pointer;
+  transition: color 0.2s var(--ease), background 0.2s var(--ease),
+    border-color 0.2s var(--ease);
+}
+
+.room-back:hover {
+  color: var(--text);
+  background: var(--surface-2);
+  border-color: rgba(255, 255, 255, 0.32);
+}
+
+.room-back .arrow {
+  transition: transform 0.25s var(--ease);
+}
+
+.room-back:hover .arrow {
+  transform: translateX(-3px);
+}
+
+.room h2 {
+  font-size: clamp(26px, 3.4vw, 38px);
+  margin: 12px 0 0;
+}
+
+.room .lead {
+  margin-top: 12px;
+}
+
+/* ---- contact form --------------------------------------------------------- */
+
+.contact-form {
+  margin-top: 20px;
+  display: grid;
+  gap: 14px;
+}
+
+.field {
+  display: grid;
+  gap: 8px;
+}
+
+/* two short fields side by side (Name/Email, Company/Phone) */
+.field-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 14px;
+}
+
+@media (max-width: 480px) {
+  .field-row {
+    grid-template-columns: 1fr;
+  }
+}
+
+.field label {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.field input,
+.field textarea {
+  width: 100%;
+  font-family: var(--font-sans);
+  font-size: 15px;
+  color: var(--text);
+  background: var(--surface);
+  border: 1px solid var(--border-strong);
+  border-radius: 14px;
+  padding: 13px 16px;
+  transition: border-color 0.2s var(--ease), background 0.2s var(--ease);
+}
+
+.field textarea {
+  resize: vertical;
+  min-height: 84px;
+  line-height: 1.55;
+}
+
+.field input::placeholder,
+.field textarea::placeholder {
+  color: var(--dim);
+}
+
+.field input:focus,
+.field textarea:focus {
+  outline: none;
+  border-color: rgba(255, 255, 255, 0.45);
+  background: var(--surface-2);
+}
+
+/* stay monochrome even when a field is invalid — a brighter white border, no red */
+.field input:user-invalid,
+.field textarea:user-invalid {
+  border-color: rgba(255, 255, 255, 0.5);
+}
+
+/* ---- custom dropdown (budget range) --------------------------------------- */
+.dropdown {
+  position: relative;
+}
+
+/* the closed control — matches the inputs exactly */
+.dropdown-btn {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  font-family: var(--font-sans);
+  font-size: 15px;
+  text-align: left;
+  color: var(--text);
+  background: var(--surface);
+  border: 1px solid var(--border-strong);
+  border-radius: 14px;
+  padding: 13px 16px;
+  cursor: pointer;
+  transition: border-color 0.2s var(--ease), background 0.2s var(--ease);
+}
+
+.dropdown-btn:hover {
+  background: var(--surface-2);
+}
+
+.dropdown-btn:focus-visible,
+.dropdown.is-open .dropdown-btn {
+  outline: none;
+  border-color: rgba(255, 255, 255, 0.45);
+  background: var(--surface-2);
+}
+
+.dropdown-value.is-placeholder {
+  color: var(--dim);
+}
+
+/* CSS chevron that flips when open */
+.dropdown-chevron {
+  flex: none;
+  width: 9px;
+  height: 9px;
+  border-right: 1.5px solid var(--muted);
+  border-bottom: 1.5px solid var(--muted);
+  transform: translateY(-2px) rotate(45deg);
+  transition: transform 0.25s var(--ease);
+}
+
+.dropdown.is-open .dropdown-chevron {
+  transform: translateY(2px) rotate(-135deg);
+}
+
+/* the open panel — solid so it reads cleanly over the 3D behind the room */
+.dropdown-list {
+  position: absolute;
+  z-index: 5;
+  top: calc(100% + 8px);
+  left: 0;
+  right: 0;
+  list-style: none;
+  margin: 0;
+  padding: 6px;
+  max-height: 260px;
+  overflow-y: auto;
+  background: #0c0d11;
+  border: 1px solid var(--border-strong);
+  border-radius: 14px;
+  box-shadow: 0 26px 60px -28px rgba(0, 0, 0, 0.95);
+  animation: dropdownIn 0.18s var(--ease);
+}
+
+@keyframes dropdownIn {
+  from { opacity: 0; transform: translateY(-6px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.dropdown-option {
+  padding: 11px 12px;
+  border-radius: 9px;
+  font-size: 15px;
+  color: var(--muted);
+  cursor: pointer;
+  transition: background 0.15s var(--ease), color 0.15s var(--ease);
+}
+
+.dropdown-option:hover,
+.dropdown-option.is-active {
+  background: var(--surface-2);
+  color: var(--text);
+}
+
+.dropdown-option.is-selected {
+  color: var(--text);
+}
+
+.dropdown-option.is-selected::after {
+  content: "✓";
+  float: right;
+  color: var(--muted);
+}
+
+.contact-form .btn {
+  margin-top: 6px;
+  justify-self: start;
+}
+
+.form-success {
+  margin-top: 30px;
+  padding: 22px;
+  border: 1px solid var(--border);
+  border-radius: 18px;
+  background: var(--surface);
+  color: var(--muted);
+}
+
+.form-success strong {
+  color: var(--text);
+  font-weight: 600;
+}
+
+.form-success .btn {
+  margin-top: 14px;
+}
+
+@media (max-width: 860px) {
+  /* the page behind doesn't need a big shove on small screens */
+  body.room-open main {
+    transform: translateX(-3%);
+  }
+
+  /* a soft dark scrim keeps the form crisp over the moving 3D, like the rows do */
+  .room-inner {
+    margin-inline: auto; /* re-centre on phones */
+    width: min(600px, 100%);
+    padding: clamp(22px, 6vw, 30px);
+    border-radius: 16px;
+    background: radial-gradient(ellipse 120% 100% at 50% 40%,
+        rgba(0, 0, 0, 0.9) 42%, rgba(0, 0, 0, 0.62) 76%, transparent 100%);
+  }
 }
 
 /* ---- reduced motion ------------------------------------------------------- */

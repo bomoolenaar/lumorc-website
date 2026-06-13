@@ -41,6 +41,7 @@ const STAGES = {
   phone: { file: 'phone.glb', shape: phoneTarget },
   studio: { file: 'Studio.glb', shape: watchTarget },
   approach: { file: 'approach.glb', shape: torusTarget }, // "how a project runs"
+  contact: { file: 'uni.glb', shape: sphereTarget, fit: 3.3, tilt: -0.6, yaw: 0.4 + 3 * Math.PI / 4 }, // bigger + slanted + turned (90° left, then 45° right)
 };
 
 const mount = document.getElementById('canvas-container');
@@ -113,7 +114,7 @@ function initLiquid(mount) {
       const t = stage.shape([dirs[i3], dirs[i3 + 1], dirs[i3 + 2]]);
       stage.pos[i3] = t[0]; stage.pos[i3 + 1] = t[1]; stage.pos[i3 + 2] = t[2];
     }
-    if (stage.file) loadModelInto(stage.file, stage.pos, N, stage.yaw || 0);
+    if (stage.file) loadModelInto(stage.file, stage.pos, N, stage);
   }
 
   const geometry = new THREE.BufferGeometry();
@@ -151,6 +152,16 @@ function initLiquid(mount) {
     pointer.y = -((e.clientY / window.innerHeight) * 2 - 1);
   });
 
+  // --- "enter a room" object move ------------------------------------------------
+  // script.js dispatches lumorc:room { open } when the contact email is clicked.
+  // The centerpiece travels with you into the contact room and parks beside the
+  // form (right side on desktop) instead of being ejected off-screen.
+  let inRoom = false;
+  let roomScale = 1; // eased size multiplier so the object GROWS into the contact room
+  window.addEventListener('lumorc:room', (e) => {
+    inRoom = !!(e.detail && e.detail.open);
+  });
+
   const REPEL = 0.55;
   const blobR = 0.86;
   const amp = reduced ? 0 : 0.14;
@@ -167,7 +178,12 @@ function initLiquid(mount) {
       const vFov = (camera.fov * Math.PI) / 180;
       const halfH = camera.position.z * Math.tan(vFov / 2);
       const halfW = halfH * camera.aspect;
-      const scale = Math.min(halfW, halfH) * (isMobile ? 0.52 : 0.46);
+      let scale = Math.min(halfW, halfH) * (isMobile ? 0.44 : 0.46);
+      // grow into the contact room: ease the size up ~20% so it visibly expands
+      // during the slide-in transition (and ease back out when leaving)
+      const roomTarget = inRoom ? (isMobile ? 1.2 : 1.35) : 1;
+      roomScale = reduced ? roomTarget : roomScale + (roomTarget - roomScale) * 0.07;
+      scale *= roomScale;
       points.scale.setScalar(scale);
 
       // active section → side, vertical position, and target stage
@@ -186,11 +202,9 @@ function initLiquid(mount) {
         const tRect = tEl ? tEl.getBoundingClientRect() : rect;
         const winH = window.innerHeight;
         if (isMobile) {
-          // PHONE: a completely fixed vertical spot — parked just below the text block
-          // (using its real height) and NEVER following the scroll, so it always stays
-          // put under the text instead of drifting with the page.
-          const halfText = (tRect.height / 2) / winH;
-          cyFrac = clamp(0.5 + halfText + 0.06, 0.6, 0.82);
+          // PHONE: the text rides the TOP of each section (see CSS), so the object lives
+          // in the lower half at a FIXED spot and never follows the scroll.
+          cyFrac = 0.7;
         } else {
           // DESKTOP: level with the centred text, held in place by a dead zone; only a
           // small nudge as the section enters/leaves so it never rides the full scroll.
@@ -216,8 +230,14 @@ function initLiquid(mount) {
 
       // position: hold during exit, SNAP to the new spot during the off-screen swap, then
       // only track the scroll once settled — so the slide-in lands cleanly with no overshoot
-      const tx = (side * 2 - 1) * halfW * 0.86;
-      const ty = -(cyFrac * 2 - 1) * halfH * 0.9;
+      let tx = (side * 2 - 1) * halfW * 0.86;
+      let ty = -(cyFrac * 2 - 1) * halfH * 0.9;
+      if (inRoom) {
+        // park the object in the contact room: shifted toward the centre-left on
+        // desktop so it fills more of the view; tucked behind the centred card on phones
+        tx = isMobile ? 0 : halfW * 0.28;
+        ty = isMobile ? -halfH * 0.12 : halfH * 0.12;
+      }
       if (crossed) {
         points.position.x = tx;
         points.position.y = ty;
@@ -331,24 +351,42 @@ function initLiquid(mount) {
 
 /* ---- model loading + surface sampling -------------------------------------- */
 
-function loadModelInto(file, targetArr, n, extraYaw = 0) {
+function loadModelInto(file, targetArr, n, opts = {}) {
+  const { yaw = 0, tilt = 0, fit = FIT_SIZE } = opts;
   const url = MODEL_URLS['./models/' + file];
   if (!url) return;
   new GLTFLoader().load(
     url,
     (gltf) => {
       try {
-        const geo = buildPositionGeometry(gltf.scene);
-        if (!geo) return;
-        normalizeGeometry(geo, FIT_SIZE);
-        if (extraYaw) geo.rotateY(extraYaw); // per-model orientation tweak
-        const sampler = new MeshSurfaceSampler(new THREE.Mesh(geo)).build();
-        const p = new THREE.Vector3();
-        for (let i = 0; i < n; i++) {
-          sampler.sample(p);
-          targetArr[i * 3] = p.x;
-          targetArr[i * 3 + 1] = p.y;
-          targetArr[i * 3 + 2] = p.z;
+        const built = buildPositionGeometry(gltf.scene);
+        if (!built) return;
+        const { geo, isPoints } = built;
+        normalizeGeometry(geo, fit); // per-model size — `fit` overrides the default
+        if (tilt) geo.rotateX(tilt); // slant it so you look into the shape
+        if (yaw) geo.rotateY(yaw); // per-model spin
+        if (isPoints) {
+          // POINT CLOUD (e.g. a Sketchfab scan): the vertices already ARE the
+          // shape, so scatter our particles straight across them. No surface to
+          // area-sample — MeshSurfaceSampler would be meaningless here.
+          const pos = geo.getAttribute('position');
+          const count = pos.count;
+          for (let i = 0; i < n; i++) {
+            const k = (Math.random() * count) | 0;
+            targetArr[i * 3] = pos.getX(k);
+            targetArr[i * 3 + 1] = pos.getY(k);
+            targetArr[i * 3 + 2] = pos.getZ(k);
+          }
+        } else {
+          // TRIANGLE MESH: sample evenly across the surface by face area.
+          const sampler = new MeshSurfaceSampler(new THREE.Mesh(geo)).build();
+          const p = new THREE.Vector3();
+          for (let i = 0; i < n; i++) {
+            sampler.sample(p);
+            targetArr[i * 3] = p.x;
+            targetArr[i * 3 + 1] = p.y;
+            targetArr[i * 3 + 2] = p.z;
+          }
         }
         geo.dispose();
       } catch (e) {
@@ -363,18 +401,23 @@ function loadModelInto(file, targetArr, n, extraYaw = 0) {
 function buildPositionGeometry(root) {
   root.updateMatrixWorld(true);
   const geoms = [];
+  let anyMesh = false, anyPoints = false;
   root.traverse((o) => {
-    if (o.isMesh && o.geometry && o.geometry.getAttribute('position')) {
-      const src = o.geometry.index ? o.geometry.toNonIndexed() : o.geometry.clone();
-      const g = new THREE.BufferGeometry();
-      g.setAttribute('position', src.getAttribute('position').clone());
-      g.applyMatrix4(o.matrixWorld);
-      geoms.push(g);
-      if (src !== o.geometry) src.dispose();
-    }
+    // accept real meshes AND point clouds (Sketchfab/photogrammetry scans export
+    // as THREE.Points, so o.isMesh is false and they were being skipped before)
+    if (!(o.isMesh || o.isPoints) || !o.geometry || !o.geometry.getAttribute('position')) return;
+    if (o.isMesh) anyMesh = true; else anyPoints = true;
+    const src = o.geometry.index ? o.geometry.toNonIndexed() : o.geometry.clone();
+    const g = new THREE.BufferGeometry();
+    g.setAttribute('position', src.getAttribute('position').clone());
+    g.applyMatrix4(o.matrixWorld);
+    geoms.push(g);
+    if (src !== o.geometry) src.dispose();
   });
   if (!geoms.length) return null;
-  return geoms.length === 1 ? geoms[0] : mergeGeometries(geoms, false);
+  const geo = geoms.length === 1 ? geoms[0] : mergeGeometries(geoms, false);
+  // only treat it as a point cloud when there's no real surface to sample
+  return { geo, isPoints: anyPoints && !anyMesh };
 }
 
 function normalizeGeometry(g, size) {
@@ -452,6 +495,12 @@ function phoneTarget(d) {
 
 function watchTarget(d) {
   return rotXY(roundedBox(d, 0.34, 0.4, 0.1, 0.4), -0.1, 0.4);
+}
+
+// plain sphere — fallback shape if a model file is missing (dirs are already on
+// the unit sphere, so just scale them out)
+function sphereTarget(d) {
+  return [d[0] * 0.95, d[1] * 0.95, d[2] * 0.95];
 }
 
 // a tilted ring/torus — reads as a "process loop" for the Approach section
